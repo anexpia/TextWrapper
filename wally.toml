@@ -1,9 +1,0 @@
-[package]
-name = "anexpia/textwrapper"
-description = "Module to wrap text into multiple lines"
-license = "MIT"
-version = "1.0.0"
-registry = "https://github.com/UpliftGames/wally-index"
-realm = "shared"
-
-[dependencies]
