@@ -25,7 +25,7 @@ export type WrapTextResult = {
 	Height: number;
 	
 	Lines: {LineInfo};
-	CharacterOffsets: {Vector2}?;
+	CharacterOffsets: {vector}?;
 }
 
 type textsource = TextLabel | {
@@ -39,6 +39,8 @@ type textsource = TextLabel | {
 
 local textparams = Instance.new("GetTextBoundsParams")
 textparams.RichText = true
+
+local empty = {}
 
 -- Wrap text into lines and finds offset of each character within 'CharactersToFind' if array is provided.
 @native
@@ -72,9 +74,7 @@ local function WrapText(TextSource: textsource, CharactersToFind: {number}?): (W
 	
 	local richtextdetails, escapepositions
 	if richtextsuccess then richtextdetails, escapepositions = EvaluateRichtext(text, textsize, TextSource.FontFace) end
-	
-	local lines = {}
-	
+
 	local currentfont: Font = TextSource.FontFace
 	local fonthash: string?
 	
@@ -101,8 +101,11 @@ local function WrapText(TextSource: textsource, CharactersToFind: {number}?): (W
 	local splitpointrichtextstart = ""
 	local splitpointrichtextend = ""
 	
+	local lines = {}
 	local linesizes: {{number}} = {}
-	local foundcharactersinpotentialnewline: {Vector2} = {}
+	
+	local thislinefoundcharacters: {true} = if sortedcharacterarray then {} else empty
+	local foundcharactersinpotentialnewline: {true} = if sortedcharacterarray then {} else empty
 	
 	local function newline(mergecharadd: boolean?)
 		local content, height, width = "", 0, 0
@@ -123,6 +126,13 @@ local function WrapText(TextSource: textsource, CharactersToFind: {number}?): (W
 			currentwidth = 0
 			
 			currentlinecontent = richtextstart
+			
+			for pos in thislinefoundcharacters do 
+				local vec = findcharacterresult[pos]
+				findcharacterresult[pos] = vector.create(vec.x, vec.y, height)
+			end
+			
+			table.clear(thislinefoundcharacters)
 		else 
 			content = `{currentlinecontent}{splitpointrichtextend}`
 			width = math.min(splitpointwidth, textmaxwidth)
@@ -146,8 +156,16 @@ local function WrapText(TextSource: textsource, CharactersToFind: {number}?): (W
 			lastcurrentwidth -= splitpointwidth
 			currentwidth -= splitpointwidth
 			
-			for pos, vec in foundcharactersinpotentialnewline do 
-				findcharacterresult[pos] = vec + Vector2.new(-splitpointwidth, height)
+			for pos in foundcharactersinpotentialnewline do 
+				findcharacterresult[pos] += vector.create(-splitpointwidth, height)
+			end
+			
+			for pos in thislinefoundcharacters do 
+				if foundcharactersinpotentialnewline[pos] then continue end 
+				thislinefoundcharacters[pos] = nil
+				
+				local vec = findcharacterresult[pos]
+				findcharacterresult[pos] = vector.create(vec.x, vec.y, height)
 			end
 			
 			currentlinecontent = splitpointrichtextstart
@@ -174,11 +192,12 @@ local function WrapText(TextSource: textsource, CharactersToFind: {number}?): (W
 					toremove = i 
 
 					local location = table.find(CharactersToFind :: {number}, findpos) :: number
-					local vec = Vector2.new(math.max(0, lastcurrentwidth), currentheight)
-					findcharacterresult[location] = vec
+
+					findcharacterresult[location] = vector.create(math.max(0, lastcurrentwidth), currentheight)
+					thislinefoundcharacters[location] = true 
 					
 					if haswhitespace and (not iswhitespace) then
-						foundcharactersinpotentialnewline[location] = vec
+						foundcharactersinpotentialnewline[location] = true
 					end
 				else break end
 			end
